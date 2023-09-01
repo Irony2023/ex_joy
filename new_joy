@@ -1,48 +1,39 @@
-import pygame
-
-# Initialize pygame
-pygame.init()
-
-# Initialize the gamepad
-pygame.joystick.init()
+from inputs import get_gamepad
 
 # Define the name of the Logitech F710 gamepad (adjust if necessary)
 gamepad_name = "Logitech Gamepad F710"
 
 # Find the gamepad device
-gamepad = None
-for joystick_id in range(pygame.joystick.get_count()):
-    joystick = pygame.joystick.Joystick(joystick_id)
-    joystick.init()
-    if joystick.get_name() == gamepad_name:
-        gamepad = joystick
-        break
+gamepad_device = None
 
-if gamepad is None:
+while gamepad_device is None:
+    events = get_gamepad()
+    for event in events:
+        if event.ev_type == "DeviceAdded":
+            if event.ev_device == gamepad_name:
+                gamepad_device = event.ev_device
+                break
+
+if gamepad_device is None:
     print(f"Device '{gamepad_name}' not found. Make sure it's connected.")
-    pygame.quit()
-    exit()
+else:
+    print(f"Found '{gamepad_name}'")
 
-print(f"Found '{gamepad_name}'")
+    # Track the state of the X button
+    x_button_pressed = False
 
-# Main loop to check for button events
-running = True
-x_button_pressed = False
+    try:
+        while True:
+            events = get_gamepad()
+            for event in events:
+                if event.ev_type == "Key" and event.ev_device == gamepad_name:
+                    if event.ev_code == "BTN_SOUTH":  # Adjust to match the X button code on your gamepad
+                        if event.ev_value == 1 and not x_button_pressed:
+                            x_button_pressed = True
+                            print("X button pressed")
+                        elif event.ev_value == 0 and x_button_pressed:
+                            x_button_pressed = False
+                            print("X button released")
 
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
-    # Check for the X button
-    x_button_state = gamepad.get_button(0)  # Replace 0 with the appropriate button index if needed
-
-    if x_button_state == 1 and not x_button_pressed:
-        x_button_pressed = True
-        print("X button pressed")
-    elif x_button_state == 0 and x_button_pressed:
-        x_button_pressed = False
-        print("X button released")
-
-# Clean up pygame
-pygame.quit()
+    except KeyboardInterrupt:
+        print("Exiting...")
