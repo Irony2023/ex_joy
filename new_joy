@@ -1,37 +1,19 @@
 import evdev
 
-def find_gamepad():
-    gamepad_name = None
-    devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
-    
-    for device in devices:
-        if "event" in device.fn:  # Filter out devices with "event" in the filename
-            gamepad_name = device.name
-            break
-    
-    return gamepad_name
+# Define the name of the Logitech Gamepad F710
+gamepad_name = "Logitech Gamepad F710"
 
-def monitor_gamepad(gamepad_name):
-    try:
-        gamepad = evdev.InputDevice(gamepad_name)
-        
-        for event in gamepad.read_loop():
-            if event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_X:
-                if event.value == 1:
-                    print("X button pushed")
-                elif event.value == 0:
-                    print("X button released")
-    
-    except FileNotFoundError:
-        print(f"Gamepad '{gamepad_name}' not found.")
-    except KeyboardInterrupt:
-        print("Monitoring ended.")
+# List all input devices
+devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
 
-if __name__ == "__main__":
-    gamepad_name = find_gamepad()
-    
-    if gamepad_name:
-        print(f"Gamepad detected: {gamepad_name}")
-        monitor_gamepad(gamepad_name)
-    else:
-        print("No gamepad detected.")
+# Search for the Logitech Gamepad F710
+gamepad_found = False
+for device in devices:
+    if device.name == gamepad_name:
+        gamepad_found = True
+        print(f"Device '{gamepad_name}' is connected to the gamepad.")
+        break
+
+# If the gamepad is not found, print a message
+if not gamepad_found:
+    print(f"Device '{gamepad_name}' is not connected to the gamepad.")
