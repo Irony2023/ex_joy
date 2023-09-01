@@ -3,17 +3,27 @@ import evdev
 # Define the name of the Logitech Gamepad F710
 gamepad_name = "Logitech Gamepad F710"
 
+# Define the button code for the X button
+x_button_code = 304  # This code may vary depending on your specific device
+
 # List all input devices
 devices = [evdev.InputDevice(fn) for fn in evdev.list_devices()]
 
-# Search for the Logitech Gamepad F710
-gamepad_found = False
+# Find the device corresponding to the Logitech Gamepad F710
+gamepad_device = None
 for device in devices:
     if device.name == gamepad_name:
-        gamepad_found = True
-        print(f"Device '{gamepad_name}' is connected to the gamepad.")
+        gamepad_device = device
         break
 
-# If the gamepad is not found, print a message
-if not gamepad_found:
-    print(f"Device '{gamepad_name}' is not connected to the gamepad.")
+if gamepad_device:
+    print(f"Monitoring '{gamepad_name}' for X button activation...")
+
+    # Continuously monitor events from the gamepad
+    for event in gamepad_device.read_loop():
+        if event.type == evdev.ecodes.EV_KEY and event.code == x_button_code:
+            if event.value == 1:  # Button press (1) or release (0)
+                print("X button activated!")
+
+else:
+    print(f"Device '{gamepad_name}' is not connected.")
