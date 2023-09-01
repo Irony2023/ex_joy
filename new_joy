@@ -11,10 +11,27 @@ def find_gamepad():
     
     return gamepad_name
 
+def monitor_gamepad(gamepad_name):
+    try:
+        gamepad = evdev.InputDevice(gamepad_name)
+        
+        for event in gamepad.read_loop():
+            if event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_X:
+                if event.value == 1:
+                    print("X button pushed")
+                elif event.value == 0:
+                    print("X button released")
+    
+    except FileNotFoundError:
+        print(f"Gamepad '{gamepad_name}' not found.")
+    except KeyboardInterrupt:
+        print("Monitoring ended.")
+
 if __name__ == "__main__":
     gamepad_name = find_gamepad()
     
     if gamepad_name:
         print(f"Gamepad detected: {gamepad_name}")
+        monitor_gamepad(gamepad_name)
     else:
         print("No gamepad detected.")
