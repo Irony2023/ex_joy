@@ -1,47 +1,49 @@
-# Released by rdb under the Unlicense (unlicense.org)
-# Based on information from:
-# https://www.kernel.org/doc/Documentation/input/joystick-api.txt
+from __future__ import division
+from fcntl import ioctl
 import RPi.GPIO as GPIO
 import pigpio
 import time
 import os, struct, array
-import paho.mqtt.client as mqtt
-import urllib.request
-from fcntl import ioctl
-import threading
+import paho.mqtt.client as mqtt #
+import Adafruit_PCA9685
+from video import capture_video
 import subprocess
 
 
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(7,GPIO.OUT, initial=GPIO.HIGH)
+GPIO.setup(22, GPIO.OUT)
 
-# It will be used by the modul threading. It is important for the delay for 4G.
-def send_message(topic, value, zahl):
-    
-    client.publish(topic, value, zahl)
-
-
-    
-# servo1 = 17  
-# servo2 = 27
-# servo3 = 22
-
-broker = '192.168.7.22' # This is also the ip address of the Husky
-print("Connecting control to broker (excavator) on 192.168.7.22 (ip address of excavator)")
+pwm = Adafruit_PCA9685.PCA9685(address=0x41)
 
 
+def set_servo_pulse(channel, pulse):
+    pulse_length = 1000000
+    pulse_length /= 50 # 50 Hz
+    # print('{0}us per period'.format(pulse_length))
+    pulse_length /= 4096 # 12 bits of resolution
+    # print('{0}us per bit'.format(pulse_length))
+    pulse *= 1000
+    # print(pulse_length)
+    pulse /= pulse_length
+    # print(pulse)
+    pulse = round(pulse)
+    # print(pulse)
+    pulse = int(pulse)
+    #print ("pulse",pulse)
+    pwm.set_pwm(channel, 0, pulse)
 
+
+
+# Frequency set to 50Hz
+pwm.set_pwm_freq(50)
+
+fvalue = 0
+drive_mode = 0
 
 delay_flag = False # 5G is always enable
 
-# pwm = pigpio.pi()
-# pwm.set_mode(servo1, pigpio.OUTPUT)
-# pwm.set_PWM_frequency( servo1, 50 )
-# pwm.set_PWM_frequency( servo2, 50 )
-# pwm.set_PWM_frequency( servo3, 50 )
-client = mqtt.Client()
-# client.on_message=on_message
-client.connect(broker, 1883, 60)
-client.loop_start()
-print("Connected.")
+
 # Iterate over the joystick devices.
 print('Available devices:')
 
@@ -182,6 +184,7 @@ while True:
     axis_percentage = 0
     servo_pulsewidth = 0
     evbuf = jsdev.read(8)
+
     
     # Check if delay for 4G is activated
     if delay_flag == False:
@@ -215,9 +218,10 @@ while True:
                     
                     if value == 1: # Button pressed
                         
-                        delay_flag = True # 4G
-                    
-                        client.publish('gamepad/b', value, 0) # 4G --> Nachricht senden, damit LED rot beleuchtet
+                        delay_flag = False # 4G
+                        
+                        if (fvalue ==1 ):
+                            pass
                         
                     if value:
                         print("b pressed")
@@ -231,69 +235,41 @@ while True:
                     if value == 1: # Button pressed
                         
                         delay_flag = False # 5G
-                    
-                        client.publish('gamepad/x', value, 0) # 5G --> Nachricht senden, damit LED gruen beleuchtet
-                    
+                        
+                        if (fvalue ==1 ):
+                            pass
+                        
                     if value:
                         print("x pressed")
                     else:
                         print("x released")
-                if number == 3:
-                    if value:
-                        print("y pressed")
-                    else:
-                        print("y released")
-                
+                        
                 
                 # Button 'A' --> Streaming the videos
                 if number == 0:
                     
                     if value == 1: # Button pres
+                        if (fvalue == 1):
+                            camera_process = subprocess.Popen(["python" , "video.py"])
+                            pass
+                        print ("button a pressed")
                         
-                         client.publish('gamepad/a', value, 0)
-                         print ("button a pressed")
-                        
-                        #os.system("sudo reboot") # reboot control
-
-    #                else:
-    #                    print("a released")
-    
                 
                 # Button 'LB' --> left/rigth drive
                 if number == 4:
-    #                print("LB Input:")
+                    if (fvalue == 1):
+                        drive_mode = 1
+                        
+                    if (fvalue == 0):
+                        drive_mode = 1
+                        
+                        
+                    set_servo_pulse(5,0)
                     
-                        
-                    client.publish('gamepad/LB', value, 0)
-    #            if number == 5:
-    #                if value:
-    #                    print("RB pressed")
-    #                else:
-    #                    print("RB released")
-    #            if number == 6:
-    #                if value:
-                            
-    #                    client.publish('gamepad/BACK', value, 0)
-    #                    print("BACK pressed")
-    #                else:
-    #                     print("BACK released")
-    #            if number == 7:
-    #                if value:
-    #                    print("START pressed")
-    #                else:
-    #                    print("START released")
-    #            if number == 10:
-    #                if value:
-    #                    print("Rechter Stick pressed")
-    #                else:
-    #                    print("Rechter Stick released")
-    #            if number == 9:
-    #                if value:
-    #                    print("Linker Stick pressed")
-    #                else:
-    #                    print("Linker Stick released")
-                        
-            # Check the state of axes and identify, which axis was used.
+                    set_servo_pulse(4,0)
+                    
+                    
+                    
             # Every axis is assigned a number            
             if type & 0x02:
                 axis = axis_map[number]
@@ -308,249 +284,138 @@ while True:
                     if number == 1:
                         #fvalue=fvalue*(-1)
                         print("Linker Stick Y: %.3f" % (fvalue))
-
                         
-                        client.publish('gamepad/linkerstick_y', fvalue, 0)
-    #                     servo_pulsewidth = fvalue*500+1500
-    #                     pwm.set_servo_pulsewidth( servo2, servo_pulsewidth)
-                    
-                    
+                        # Boom movements
+                        
+                        # Button 'LB' is not being held pressed anymore
+                        if(drive_mode == 0):
+                            
+                            if (fvalue) >= 0.77:
+                                calc_servo = fvalue/4.6 +1.58465
+
+                            elif (fvalue) <= -0.2:
+                                calc_servo = fvalue/5+1.58465
+
+                            else :
+                                calc_servo = 1.58465
+                            
+                            # Channel 0
+                            set_servo_pulse(0,calc_servo) # Values of pulse between 430 and 219 (approximately). Out of 4096.
+                            
+                            if(fvalue < 0.2 and fvalue > -0.2):
+                                
+                                GPIO.output(22, GPIO.LOW)
+                            else:
+                                
+                                GPIO.output(22, GPIO.HIGH)
+                        #left drive--> LB is being pressed
+                                
+                        if(drive_mode == 1):
+                            
+                            calc_servo=fvalue*0.2+1.4
+                            
+                            set_servo_pulse(4,calc_servo) # Values of pulse between 392 and 181 (approximately). Out of 4096.
+
+
                     # Axis 'LT' --> Bucket
                     if number == 2:
                         print("LT: %.3f" % (fvalue))
                         axis_percentage = ((fvalue+1)/2) # With this formel we gets values between 0,0 and 1,0.
                         
+                        # Bucket --> Downward movement
                         
-                        client.publish('gamepad/LT', axis_percentage, 0)
-    #                     servo_pulsewidth = axis_percentage*(-1000)+1500
-    #                     pwm.set_servo_pulsewidth( servo1, servo_pulsewidth)
-                    if number == 3:
-                        print("Rechter Stick X: %.3f" % (fvalue))
+                        # The button 'LT' was pressed
+                        calc_servo=fvalue*0.1+1.6 
+
+                        # Channel 2
+                        set_servo_pulse(2,calc_servo) # Values of pulse between 327 and 433 (approximately). Out of 4096.
+                        # Adjastment of the sensitivity of the bucket's reaction
+                        
+                        if(fvalue < 0.2):
+                            GPIO.output(22, GPIO.LOW)
+                        else:
+                            GPIO.output(22, GPIO.HIGH)
+                            
+                            
+                    #if number == 3:
+                        #print("Rechter Stick X: %.3f" % (fvalue))
+
                     
                     
                     # Right joystick: axis-y --> Arm
                     if number == 4:
                         print("Rechter Stick Y: %.3f" % (fvalue))
-                        
-                        client.publish('gamepad/rechterstick_y', fvalue, 0)
-    #                     servo_pulsewidth = fvalue*500+1400
-    #                     pwm.set_servo_pulsewidth( servo3, servo_pulsewidth)
+                              
+                        # Arm or right drive
+                        # Button 'LB' is not being held pressed anymore
+                        if (drive_mode == 0):
+                              if (fvalue) >= 0.2:
+                                  calc_servo = fvalue/5 +1.36
+                              
+                              elif (fvalue) <= -0.2:
+                                  calc_servo = fvalue/5+1.36
+                              
+                              else :
+                                  calc_servo = 1.36
+                              
+                              set_servo_pulse(1,calc_servo) # Values of pulse between 383 and 173 (approximately). Out of 4096.
+                              
+                              # Adjastment of the sensitivity of the Arm's reaction
+                              if(fvalue < 0.2 and fvalue > -0.2):
+                                  GPIO.output(22, GPIO.LOW)
+                              else:
+                                  GPIO.output(22, GPIO.HIGH)
+                              # right drive
+                            # Button 'LB' is being held pressed
+                              
+                        if(drive_mode == 1):
+                        # The right joystick was pressed
+                              calc_servo=(-1)*fvalue*0.52+1.4 # Values of calc_servo between 1,9 and 0,89 (approximately). Values of fvalue between -1,0 and 1,0.-->0.5145+1.4
+                              
+                              # The rigt drive moves <-- back or forward -->
+                              # Chanel 5
+                              set_servo_pulse(5,calc_servo) # Values of pulse between 392 and 181 (approximately). Out of 4096.
+            
                     
                     
                     # Axis 'RT' --> Bucket
                     if number == 5:
     #                    print("RT: %.3f" % (fvalue))
                         axis_percentage = ((fvalue+1)/2)
-                         
-                        client.publish('gamepad/RT', axis_percentage, 0)
-    #                     servo_pulsewidth = axis_percentage*500+1500
-    #                     pwm.set_servo_pulsewidth( servo1, servo_pulsewidth)
                     
                     
-                    # Left joystick: x-axis --> swing
+                    # Bucket --> Upward movement
+
+                    # The button 'RT' was pressed
+                        calc_servo=(-1)*fvalue*0.22+1.6 # Values of calc_servo between 1,6 and 1,08 (approximately). Values of fvalue between 0,0 and 1,0-->0.5145+1.6
+                        set_servo_pulse(2,calc_servo) # Values of pulse between 327 and 222 (approximately). Out of 4096.
+                        
+                        # Adjastment of the sensitivity of the bucket's reaction
+                        if(fvalue < 0.2):
+                              
+                              GPIO.output(22, GPIO.LOW)
+                        else:
+                              GPIO.output(22, GPIO.HIGH)
+
+    
+                    #left--x
                     if number == 0:
                         fvalue=fvalue*(-1)
+                              
+                    # Swing --> Horizontal movement
+                        if (fvalue) >= 0.2:
+                              calc_servo = fvalue/5 + 1.4
+                              
+                        elif (fvalue) <= -0.2:
+                              calc_servo = fvalue/5 + 1.4
+                              
+                        else:
+                              calc_servo = 1.4
+                              
+                        set_servo_pulse(6,calc_servo) # Values of pulse between 392 and 181 (approximately). Out of 4096.
+                              
                         
-                        client.publish('gamepad/linkerstick_x', fvalue, 0)
-    #                    print("Linker Stick X: %.3f" % (fvalue))
-                        
-                    if number == 6:
-                        print("D_Pad X: %.3f" % (fvalue))
-                    if number == 7:
-                        print("D_Pad Y: %.3f" % (fvalue))
-    
-    
-    # Almost same code as above just only threading modul for 4G delay added. 
-    # 4G was activated.
-    elif delay_flag == True:
-        
-        if evbuf:
-            time1, value, type, number = struct.unpack('IhBB', evbuf)
-
-            if type & 0x80:
-                pass
-                #print("(initial)", end="")
-
-            if type & 0x01:
-                button = button_map[number]
-                
-                # Get the value of the button. If it was pressed is 1 otherwise 0
-                if button:
-                    button_states[button] = value
-    #                 if value:
-    #                     print(number)
-    #                     print("%s pressed" % (button))
-    #                 else:
-    #                     print(number)
-    #                     print("%s released" % (button))
-                
-                
-                # Button 'B' --> 4G
-                if number == 1:
-                    
-                    if value == 1: # Button pressed
-                        
-                        delay_flag = True # 4G
-                    
-                        client.publish('gamepad/b', value, 0) # 4G --> Nachricht senden, damit LED rot beleuchtet
-                        
-    #                if value:
-    #                    print("b pressed")
-    #                else:
-    #                    print("b released")
-                
-                
-                # Button 'X' --> 5G
-                if number == 2:
-                    
-                    if value == 1: # Button pressed
-                        
-                        delay_flag = False # 5G
-                    
-                        client.publish('gamepad/x', value, 0) # 5G --> Nachricht senden, damit LED gruen beleuchtet
-                    
-    #                if value:
-    #                    print("x pressed")
-    #                else:
-    #                    print("x released")
-    #            if number == 3:
-    #                if value:
-    #                    print("y pressed")
-    #                else:
-    #                    print("y released")
-                
-                
-                # Button 'A' --> reboot control
-                if number == 0:
-                    
-                    if value == 1: # Button pressed
-                        
-                        client.publish('gamepad/a', value, 0)
-                        
-                        #os.system("sudo reboot") # reboot control
-    #                else:
-    #                    print("a released")
-                
-                
-                # Button 'LB' --> left/rigth drive
-                if number == 4:
-    #                print("LB Input:")
-                    
-                    threading.Timer(delay_for_g, send_message, args=['gamepad/LB', value, 0]).start() # It allows to simulate the delay for 4G.
-                    
-                    #client.publish('gamepad/LB', value, 0)
-    #            if number == 5:
-    #                if value:
-    #                    print("RB pressed")
-    #                else:
-    #                    print("RB released")
-                
-    #            if number == 6:
-    #                if value:
-                        
-    #                    threading.Timer(delay_for_g, send_message, args=['gamepad/BACK', value, 0]).start()
-                        
-                        #client.publish('gamepad/BACK', value, 0)
-    #                    print("BACK pressed")
-    #                else:
-    #                     print("BACK released")
-    #            if number == 7:
-    #                if value:
-    #                    print("START pressed")
-    #                else:
-    #                    print("START released")
-    #            if number == 10:
-    #                if value:
-    #                    print("Rechter Stick pressed")
-    #                else:
-    #                    print("Rechter Stick released")
-    #            if number == 9:
-    #                if value:
-    #                    print("Linker Stick pressed")
-    #                else:
-    #                    print("Linker Stick released")
-                        
-                        
-            if type & 0x02:
-                axis = axis_map[number]
-                if axis:
-                    fvalue = value / 32767.0
-                    axis_states[axis] = fvalue
-    #                 print("%s: %.3f" % (axis, fvalue))
-                    
-                    
-                    # Left joystick: axis-y --> Boom
-                    if number == 1:
-                        #fvalue=fvalue*(-1)
-    #                    print("Linker Stick Y: %.3f" % (fvalue))
-                        
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/linkerstick_y', fvalue, 0]).start() # It allows to simulate the delay for 4G
-                        
-                        #client.publish('gamepad/linkerstick_y', fvalue, 0)
-    #                     servo_pulsewidth = fvalue*500+1500
-    #                     pwm.set_servo_pulsewidth( servo2, servo_pulsewidth)
-                    
-                    
-                    # Axis 'LT' --> Bucket
-                    if number == 2:
-    #                    print("LT: %.3f" % (fvalue))
-                        axis_percentage = ((fvalue+1)/2)
-                        
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/LT', axis_percentage, 0]).start() # It allows to simulate the delay for 4G
-                        
-                        #client.publish('gamepad/LT', axis_percentage, 0)
-    #                     servo_pulsewidth = axis_percentage*(-1000)+1500
-    #                     pwm.set_servo_pulsewidth( servo1, servo_pulsewidth)
-    #                if number == 3:
-    #                    print("Rechter Stick X: %.3f" % (fvalue))
-                    
-                    
-                    # Right joystick: axis-y --> Arm
-                    if number == 4:
-    #                    print("Rechter Stick Y: %.3f" % (fvalue))
-                        
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/rechterstick_y', fvalue, 0]).start() # It allows to simulate the delay for 4G
-                        
-                        #client.publish('gamepad/rechterstick_y', fvalue, 0)
-                        
-    #                     servo_pulsewidth = fvalue*500+1400
-    #                     pwm.set_servo_pulsewidth( servo3, servo_pulsewidth)
-                    
-                    
-                    # Axis 'RT' --> Bucket
-                    if number == 5:
-    #                    print("RT: %.3f" % (fvalue))
-                        axis_percentage = ((fvalue+1)/2)
-                        
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/RT', axis_percentage, 0]).start() # It allows to simulate the delay for 4G
-                        
-                        #client.publish('gamepad/RT', axis_percentage, 0)
-    #                     servo_pulsewidth = axis_percentage*500+1500
-    #                     pwm.set_servo_pulsewidth( servo1, servo_pulsewidth)
-                    
-                    
-                    # Left joystick: x-axis --> swing
-                    if number == 0:
-                        fvalue=fvalue*(-1)
-                        
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/linkerstick_x', fvalue, 0]).start() # It allows to simulate the delay for 4G
-                        
-                        #client.publish('gamepad/linkerstick_x', fvalue, 0)
-    #                    print("Linker Stick X: %.3f" % (fvalue))
-                        
-    #                if number == 6:
-    #                    print("D_Pad X: %.3f" % (fvalue))
-    #                if number == 7:
-    #                    print("D_Pad Y: %.3f" % (fvalue))
-        
-
-
-
-
-        
 print("Now trying to send data...")
-client.loop_stop()
-client.disconnect()
 
 
 
