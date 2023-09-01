@@ -1,12 +1,16 @@
-[Unit]
-Description=My Python Script
+#[Unit]
+#Description=My script 5g excavator
+#After=network-online.target
 
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 /path/to/your/script.py
-Restart=always
-RestartSec=15
+#[Service]
+#Type=simple
+#User=pi
+#ExecStartPre=/bin/sleep 15
+#ExecStart=/usr/bin/python3 /home/pi/controller/test.py
+#ExecStart=/usr/bin/python3 /home/pi/controller/video.py
+#StandardOutput=tty
+#TTYPath=/dev/tty1
+#Restart=always
 
-[Install]
-WantedBy=multi-user.target
-
+#[Install]
+#WantedBy=multi-user.target
