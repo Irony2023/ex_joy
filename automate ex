@@ -1,0 +1,12 @@
+[Unit]
+Description=My Python Script
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /path/to/your/script.py
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
+
