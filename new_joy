@@ -9,6 +9,10 @@ import Adafruit_PCA9685
 from video import capture_video
 import subprocess
 
+import urllib.request
+import threading
+
+s=1
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(7,GPIO.OUT, initial=GPIO.HIGH)
@@ -39,7 +43,7 @@ def set_servo_pulse(channel, pulse):
 pwm.set_pwm_freq(50)
 
 fvalue = 0
-drive_mode = 0
+#drive_mode = 0
 
 delay_flag = False # 5G is always enable
 
@@ -184,6 +188,7 @@ while True:
     axis_percentage = 0
     servo_pulsewidth = 0
     evbuf = jsdev.read(8)
+    #global drive_mode 
 
     
     # Check if delay for 4G is activated
@@ -258,15 +263,17 @@ while True:
                 # Button 'LB' --> left/rigth drive
                 if number == 4:
                     if (fvalue == 1):
-                        drive_mode = 1
+                        #drive_mode = 1
+                        pass
                         
                     if (fvalue == 0):
-                        drive_mode = 1
+                        #drive_mode = 1
+                        pass
                         
                         
-                    set_servo_pulse(5,0)
+                    #set_servo_pulse(5,0)
                     
-                    set_servo_pulse(4,0)
+                    #set_servo_pulse(4,0)
                     
                     
                     
@@ -276,7 +283,9 @@ while True:
                 
                 # Get the value of the axis and save it in fvalue. Values of fvalue lies between -1,0 and 1,0.
                 if axis:
+                    
                     fvalue = value / 32767.0 # Value of the axes between -32767 and 32767.
+                    #fvalue = float(bvalue)
                     axis_states[axis] = fvalue
                     print("%s: %.3f" % (axis, fvalue))
                     
@@ -288,36 +297,37 @@ while True:
                         # Boom movements
                         
                         # Button 'LB' is not being held pressed anymore
-                        if(drive_mode == 0):
+                        #if(drive_mode == 0):
                             
-                            if (fvalue) >= 0.77:
-                                calc_servo = fvalue/4.6 +1.58465
+                        if (fvalue) >= 0.77:
+                            calc_servo = fvalue/4.6 +1.58465
 
-                            elif (fvalue) <= -0.2:
-                                calc_servo = fvalue/5+1.58465
+                        elif (fvalue) <= -0.2:
+                            calc_servo = fvalue/5+1.58465
 
-                            else :
-                                calc_servo = 1.58465
+                        else :
+                            calc_servo = 1.58465
                             
                             # Channel 0
-                            set_servo_pulse(0,calc_servo) # Values of pulse between 430 and 219 (approximately). Out of 4096.
+                        set_servo_pulse(0,calc_servo) # Values of pulse between 430 and 219 (approximately). Out of 4096.
                             
-                            if(fvalue < 0.2 and fvalue > -0.2):
+                        if(fvalue < 0.2 and fvalue > -0.2):
                                 
-                                GPIO.output(22, GPIO.LOW)
-                            else:
+                            GPIO.output(22, GPIO.LOW)
+                        else:
                                 
-                                GPIO.output(22, GPIO.HIGH)
+                            GPIO.output(22, GPIO.HIGH)
                         #left drive--> LB is being pressed
                                 
-                        if(drive_mode == 1):
+                        #if(drive_mode == 1):
                             
-                            calc_servo=fvalue*0.2+1.4
+                            #calc_servo=fvalue*0.2+1.4
                             
-                            set_servo_pulse(4,calc_servo) # Values of pulse between 392 and 181 (approximately). Out of 4096.
+                            #set_servo_pulse(4,calc_servo) # Values of pulse between 392 and 181 (approximately). Out of 4096.
 
 
                     # Axis 'LT' --> Bucket
+                    
                     if number == 2:
                         print("LT: %.3f" % (fvalue))
                         axis_percentage = ((fvalue+1)/2) # With this formel we gets values between 0,0 and 1,0.
@@ -348,33 +358,33 @@ while True:
                               
                         # Arm or right drive
                         # Button 'LB' is not being held pressed anymore
-                        if (drive_mode == 0):
-                              if (fvalue) >= 0.2:
-                                  calc_servo = fvalue/5 +1.36
+                        #if (drive_mode == 0):
+                        if (fvalue) >= 0.2:
+                            calc_servo = fvalue/5 +1.36
                               
-                              elif (fvalue) <= -0.2:
-                                  calc_servo = fvalue/5+1.36
+                        elif (fvalue) <= -0.2:
+                            calc_servo = fvalue/5+1.36
                               
-                              else :
-                                  calc_servo = 1.36
+                        else :
+                            calc_servo = 1.36
                               
-                              set_servo_pulse(1,calc_servo) # Values of pulse between 383 and 173 (approximately). Out of 4096.
+                        set_servo_pulse(1,calc_servo) # Values of pulse between 383 and 173 (approximately). Out of 4096.
                               
                               # Adjastment of the sensitivity of the Arm's reaction
-                              if(fvalue < 0.2 and fvalue > -0.2):
-                                  GPIO.output(22, GPIO.LOW)
-                              else:
-                                  GPIO.output(22, GPIO.HIGH)
+                        if(fvalue < 0.2 and fvalue > -0.2):
+                            GPIO.output(22, GPIO.LOW)
+                        else:
+                            GPIO.output(22, GPIO.HIGH)
                               # right drive
                             # Button 'LB' is being held pressed
                               
-                        if(drive_mode == 1):
+                        #if(drive_mode == 1):
                         # The right joystick was pressed
-                              calc_servo=(-1)*fvalue*0.52+1.4 # Values of calc_servo between 1,9 and 0,89 (approximately). Values of fvalue between -1,0 and 1,0.-->0.5145+1.4
+                             # calc_servo=(-1)*fvalue*0.52+1.4 # Values of calc_servo between 1,9 and 0,89 (approximately). Values of fvalue between -1,0 and 1,0.-->0.5145+1.4
                               
                               # The rigt drive moves <-- back or forward -->
                               # Chanel 5
-                              set_servo_pulse(5,calc_servo) # Values of pulse between 392 and 181 (approximately). Out of 4096.
+                              #set_servo_pulse(5,calc_servo) # Values of pulse between 392 and 181 (approximately). Out of 4096.
             
                     
                     
@@ -416,6 +426,8 @@ while True:
                               
                         
 print("Now trying to send data...")
+while(True):
+    s=1
 
 
 
