@@ -1,30 +1,4 @@
-import RPi.GPIO as GPIO
-import pigpio
-import time
 import os, struct, array
-import threading
-
-# It will be used by the modul threading. It is important for the delay for 4G.
-def send_message(topic, value, zahl):
-    # Handle local logic here if needed
-    pass
-
-# servo1 = 17
-# servo2 = 27
-# servo3 = 22
-
-# Comment out MQTT-related code
-# broker = '192.168.7.22'
-# print("Connecting control to broker (excavator) on 192.168.7.34 (ip address of excavator)")
-
-delay_flag = False # 5G is always enabled
-
-# Comment out MQTT-related code
-# client = mqtt.Client()
-# client.on_message = on_message
-# client.connect(broker, 1883, 60)
-# client.loop_start()
-# print("Connected.")
 
 # Iterate over the joystick devices.
 print('Available devices:')
@@ -35,23 +9,15 @@ for fn in os.listdir('/dev/input'):
 
 # We'll store the states here.
 axis_states = {}
-button_states = {}
 
 # These constants were borrowed from linux/input.h
 axis_names = {
-    0x00 : 'x',
-    0x01 : 'y',
+    0x00: 'x',
+    0x01: 'y',
     # Add other axis mappings as needed
 }
 
-button_names = {
-    0x120 : 'trigger',
-    0x121 : 'thumb',
-    # Add other button mappings as needed
-}
-
 axis_map = []
-button_map = []
 
 # Open the joystick device.
 fn = '/dev/input/js0'
@@ -60,122 +26,37 @@ jsdev = open(fn, 'rb')
 
 # Get the device name.
 buf = array.array('B', [0] * 64)
-ioctl(jsdev, 0x80006a13 + (0x10000 * len(buf)), buf) # JSIOCGNAME(len)
-js_name = buf.tobytes().rstrip(b'\x00').decode('utf-8')
-print('Device name: %s' % js_name)
+jsdev_name = os.path.basename(fn)
+print('Device name: %s' % jsdev_name)
 
-# Get number of axes and buttons.
+# Get number of axes.
 buf = array.array('B', [0])
-ioctl(jsdev, 0x80016a11, buf) # JSIOCGAXES
+ioctl(jsdev, 0x80016a11, buf)  # JSIOCGAXES
 num_axes = buf[0]
-
-buf = array.array('B', [0])
-ioctl(jsdev, 0x80016a12, buf) # JSIOCGBUTTONS
-num_buttons = buf[0]
 
 # Get the axis map.
 buf = array.array('B', [0] * 0x40)
-ioctl(jsdev, 0x80406a32, buf) # JSIOCGAXMAP
+ioctl(jsdev, 0x80406a32, buf)  # JSIOCGAXMAP
 
 for axis in buf[:num_axes]:
     axis_name = axis_names.get(axis, 'unknown(0x%02x)' % axis)
     axis_map.append(axis_name)
     axis_states[axis_name] = 0.0
 
-# Get the button map.
-buf = array.array('H', [0] * 200)
-ioctl(jsdev, 0x80406a34, buf) # JSIOCGBTNMAP
-
-for btn in buf[:num_buttons]:
-    btn_name = button_names.get(btn, 'unknown(0x%03x)' % btn)
-    button_map.append(btn_name)
-    button_states[btn_name] = 0
-
 print('%d axes found: %s' % (num_axes, ', '.join(axis_map)))
-print('%d buttons found: %s' % (num_buttons, ', '.join(button_map)))
 
 # Main event loop
-delay_for_g = 1.00
-
 while True:
-    axis_percentage = 0
-    servo_pulsewidth = 0
     evbuf = jsdev.read(8)
 
-    # Check if delay for 4G is activated
-    if delay_flag == False:
-        if evbuf:
-            time1, value, type, number = struct.unpack('IhBB', evbuf)
-            if type & 0x80:
-                pass
+    if evbuf:
+        _, value, type, number = struct.unpack('IhBB', evbuf)
+        if type & 0x02:  # Only check for joystick axis events
+            axis = axis_map[number]
+            if axis:
+                fvalue = value / 32767.0
+                axis_states[axis] = fvalue
 
-            if type & 0x01:
-                button = button_map[number]
-                if button:
-                    button_states[button] = value
-
-                if number == 1:
-                    if value == 1: # Button pressed
-                        delay_flag = True # 4G
-                        #client.publish('gamepad/b', value, 0)
-                    if value:
-                        print("b pressed")
-                    else:
-                        print("b released")
-
-                if number == 2:
-                    if value == 1: # Button pressed
-                        delay_flag = False # 5G
-                        #client.publish('gamepad/x', value, 0)
-                    if value:
-                        print("x pressed")
-                    else:
-                        print("x released")
-                if number == 3:
-                    if value:
-                        print("y pressed")
-                    else:
-                        print("y released")
-
-                if number == 0:
-                    if value == 1: # Button pressed
-                        #client.publish('gamepad/a', value, 0)
-                        os.system("sudo reboot") # reboot control
-
-                if number == 4:
-                    threading.Timer(delay_for_g, send_message, args=['gamepad/LB', value, 0]).start()
-
-            if type & 0x02:
-                axis = axis_map[number]
-                if axis:
-                    fvalue = value / 32767.0
-                    axis_states[axis] = fvalue
+                # Print the values of the left joystick axes (X and Y)
+                if number == 0 or number == 1:  # Assuming 0 is X-axis and 1 is Y-axis
                     print("%s: %.3f" % (axis, fvalue))
-
-                    if number == 1:
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/linkerstick_y', fvalue, 0]).start()
-
-                    if number == 2:
-                        print("LT: %.3f" % (fvalue))
-                        axis_percentage = ((fvalue+1)/2)
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/LT', axis_percentage, 0]).start()
-
-                    if number == 3:
-                        print("Rechter Stick X: %.3f" % (fvalue))
-
-                    if number == 4:
-                        print("Rechter Stick Y: %.3f" % (fvalue))
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/rechterstick_y', fvalue, 0]).start()
-
-                    if number == 5:
-                        axis_percentage = ((fvalue+1)/2)
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/RT', axis_percentage, 0]).start()
-
-                    if number == 0:
-                        fvalue=fvalue*(-1)
-                        threading.Timer(delay_for_g, send_message, args=['gamepad/linkerstick_x', fvalue, 0]).start()
-    elif delay_flag == True:
-        if evbuf:
-            time1, value, type, number = struct.unpack('IhBB', evbuf)
-            if type & 0x80:
-                pass
